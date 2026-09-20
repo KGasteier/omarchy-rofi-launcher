@@ -41,7 +41,7 @@ window {
     location:         center;
     anchor:           center;
     width:            1770px;
-    height:           1450px;
+    height:           1350px;
     padding:          0px;
     border:           1px;
     border-color:     @border-c;

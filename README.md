@@ -57,7 +57,7 @@ Raster und Größen stehen in `~/.config/omarchy/themed/applauncher.rasi.tpl`:
 ```css
 listview { columns: 7; lines: 7; }   /* Raster           */
 element-icon { size: 92px; }         /* Icon-Kantenlänge  */
-window { width: 1770px; height: 1450px; }
+window { width: 1770px; height: 1350px; }
 ```
 
 Nach dem Ändern einmal das Theme neu setzen, damit die Vorlage greift:
@@ -66,9 +66,10 @@ Nach dem Ändern einmal das Theme neu setzen, damit die Vorlage greift:
 omarchy-theme-set "$(< ~/.local/state/omarchy/current/theme.name)"
 ```
 
-Wird die Zeilenzahl erhöht, muss `height` mitwachsen — `fixed-height` ist
-aktiv, sonst schneidet das Fenster die letzte Reihe ab. Als Faustwert gilt
-rund 169 px pro Reihe bei 92-px-Icons.
+Wird die Zeilenzahl erhöht, muss `height` mitwachsen, sonst schneidet das
+Fenster die letzte Reihe ab. Als Faustwert gilt rund 169 px pro Reihe bei
+92-px-Icons; die Höhe sollte knapp bemessen sein, sonst bleibt unten
+sichtbar Leerraum stehen.
 
 `listview { spacing }` bleibt bewusst auf `0px`; der Zeilenabstand steckt im
 `element { padding }`. Andernfalls bekommt die Trennlinie unter der Zeile
@@ -123,9 +124,16 @@ zentriert im *nutzbaren* Bereich, also unterhalb einer Leiste wie Waybar —
 der Launcher wirkt dadurch zu tief. Die Fensterregel rechnet stattdessen mit
 `move` gegen die volle Monitorhöhe.
 
-**Fenstergröße bei wenigen Treffern.** Das Fenster behält seine Höhe, unten
-bleibt Leerraum — so wie beim Vorbild. Wer lieber mitschrumpfende Fenster
-mag, setzt `fixed-height: false`.
+**Das Fenster behält seine Größe**, auch wenn die Suche nur wenige Treffer
+liefert — so wie beim Vorbild.
+
+`fixed-height: false` ist hier **keine brauchbare Alternative**, auch wenn es
+naheliegt: rofi bemisst die Fensterhöhe dann nach der *Anzahl der Einträge*,
+nicht nach den belegten Rasterzeilen. Bei `flow: horizontal` passen vier
+Treffer in eine Zeile, das Fenster wird aber vier Zeilen hoch. Der
+überschüssige Bereich bekommt keinen Panel-Hintergrund und bleibt
+durchsichtig; zusätzlich springt das Fenster bei jeder Trefferzahl an eine
+andere Position. Gemessen: 4 Treffer → 4 Zeilenhöhen, 8 Treffer → 7.
 
 ## Lizenz
 
