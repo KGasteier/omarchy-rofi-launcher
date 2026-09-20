@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Mac-artiger App-Launcher auf Basis von rofi.
+#
+# Toggle: laeuft rofi bereits, wird es beendet statt ein zweites Fenster zu
+# oeffnen. pkill -x (exakter Prozessname) statt pkill rofi -- ein Teilstring
+# traefe auch fremde Prozesse, die "rofi" im Namen oder in der Kommandozeile
+# tragen.
+set -u
+
+# Themendatei: bevorzugt die vom Omarchy-Theme erzeugte Fassung, sonst die
+# statische Kopie in ~/.config/rofi.
+THEME_THEMED="$HOME/.local/state/omarchy/current/theme/applauncher.rasi"
+THEME_STATIC="${XDG_CONFIG_HOME:-$HOME/.config}/rofi/applauncher.rasi"
+
+if [[ -f $THEME_THEMED ]]; then
+  THEME="$THEME_THEMED"
+else
+  THEME="$THEME_STATIC"
+fi
+
+if pgrep -x -u "$USER" rofi >/dev/null 2>&1; then
+  pkill -x -u "$USER" rofi
+  exit 0
+fi
+
+# -display-drun setzt den Prompt-Text: hier die Lupe (Nerd Font U+F002).
+exec rofi -show drun -display-drun $'\uf002' -theme "$THEME"
