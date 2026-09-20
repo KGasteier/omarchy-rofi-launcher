@@ -91,15 +91,23 @@ def disambiguate(name, mono, used):
     return mono
 
 
+def hsl_hex(h, s, l):
+    """hsl() -> #rrggbb. Qt's SVG-Renderer kennt hsl() nicht und malt die
+    Flaeche schwarz; librsvg (rofi) kommt damit zurecht. Hex geht ueberall."""
+    import colorsys
+    r, g, b = colorsys.hls_to_rgb(h / 360, l / 100, s / 100)
+    return "#%02x%02x%02x" % (round(r * 255), round(g * 255), round(b * 255))
+
 def svg(mono, hue):
     # Einbuchstabige Monogramme duerfen groesser sein als zweibuchstabige.
     size = 62 if len(mono) == 1 else 50
+    top, bottom = hsl_hex(hue, 42, 46), hsl_hex(hue, 46, 32)
     return f'''<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
   {MARKER}
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="hsl({hue},42%,46%)"/>
-      <stop offset="100%" stop-color="hsl({hue},46%,32%)"/>
+      <stop offset="0%" stop-color="{top}"/>
+      <stop offset="100%" stop-color="{bottom}"/>
     </linearGradient>
   </defs>
   <rect x="6" y="6" width="116" height="116" rx="27" fill="url(#g)"/>
