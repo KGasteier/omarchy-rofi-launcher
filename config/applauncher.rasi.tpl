@@ -30,6 +30,7 @@ configuration {
     fg-dim:    {{ dark_foreground }}ff;
     accent:    {{ accent }}ff;
     border-c:  #ffffff1f;
+    line:      #ffffff21;   /* Trennlinie unter "zuletzt benutzt" */
 
     background-color: transparent;
     text-color:       @fg;
@@ -41,7 +42,7 @@ window {
     location:         center;
     anchor:           center;
     width:            1770px;
-    height:           1330px;
+    height:           1450px;
     padding:          0px;
     border:           1px;
     border-color:     @border-c;
@@ -92,13 +93,15 @@ listview {
     cycle:        true;
     scrollbar:    false;
     flow:         horizontal;   /* alphabetisch: links -> rechts, dann Zeile */
-    spacing:      9px;
+    /* spacing 0 + Abstand im element padding: nur so laeuft die Trennlinie
+       unter der MRU-Zeile ohne Luecken durch. */
+    spacing:      0px;
     padding:      9px 0px 0px 0px;
 }
 
 element {
     orientation:    vertical;
-    padding:        15px 6px;
+    padding:        21px 0px;
     spacing:        9px;
     border-radius:  21px;
     cursor:         pointer;
@@ -106,7 +109,7 @@ element {
 }
 
 element-icon {
-    size:                 84px;
+    size:                 92px;
     horizontal-align:     0.5;
     background-color:     transparent;
     cursor:               inherit;
@@ -119,14 +122,45 @@ element-text {
     cursor:            inherit;
 }
 
+/* Zeile "zuletzt benutzt": Der Modus meldet ihre Zellen als urgent, hier
+   bekommen sie die dezente Unterkante. Ohne MRU-Eintraege meldet der Modus
+   nichts als urgent -- dann gibt es weder Zeile noch Linie. */
+element normal.urgent, element alternate.urgent {
+    border:           0px 0px 2px 0px;
+    border-color:     @line;
+    background-color: transparent;
+    /* ohne Rundung, sonst bekommt die Trennlinie Kerben an den Zellgrenzen */
+    border-radius:    0px;
+}
+element selected.urgent {
+    border:           0px 0px 2px 0px;
+    border-color:     @line;
+    background-color: @bg-alt;
+    /* oben gerundet, unten eckig: so bleibt die Trennlinie durchgehend */
+    border-radius:    21px 21px 0px 0px;
+}
+element-text normal.urgent, element-text alternate.urgent,
+element-text selected.urgent { text-color: @fg; }
+
+/* Leere Fuellzellen der MRU-Zeile: Der Modus meldet sie als "active".
+   Sie halten die Zeile auf volle Breite, duerfen aber nicht auf die Maus
+   reagieren -- auch selected bleibt daher ohne Flaeche. */
+element normal.active, element alternate.active, element selected.active {
+    background-color: transparent;
+    border:           0px 0px 2px 0px;
+    border-color:     @line;
+    border-radius:    0px;
+}
+element-text normal.active, element-text alternate.active,
+element-text selected.active { text-color: transparent; }
+
 element normal.normal { background-color: transparent; }
 element alternate.normal { background-color: transparent; }
 
 element selected.normal {
     background-color: @bg-alt;
     text-color:       @fg;
-    border:           1px;
-    border-color:     @accent;
+    /* bewusst ohne border: die Hervorhebung ist eine Flaeche, keine Kontur */
     border-radius:    21px;
 }
 

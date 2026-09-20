@@ -12,7 +12,13 @@ o.bind("SUPER + R", "App launcher (rofi)", "omarchy-launch-rofi")
 -- stay_focused verhindert, dass ein Fokuswechsel das Overlay stehen laesst.
 o.window("^(Rofi)$", {
   float = true,
-  center = true,
+  -- Nicht "center = true": das zentriert im nutzbaren Bereich, also unterhalb
+  -- der von Waybar reservierten Leiste -> das Fenster sitzt sichtbar zu tief.
+  -- "move" mit Ausdruecken rechnet dagegen gegen die volle Monitorhoehe.
+  -- Waagerecht exakt mittig, senkrecht bewusst etwas oberhalb der Mitte:
+  -- Ein Launcher wirkt mittig platziert, wenn er leicht hoeher sitzt.
+  -- Kein fester Pixelwert, damit es auf jeder Aufloesung gleich aussieht.
+  move = { "(monitor_w-window_w)/2", "(monitor_h-window_h)*0.43" },
   pin = true,
   stay_focused = true,
   tag = "-default-opacity",

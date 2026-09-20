@@ -1,0 +1,189 @@
+#!/usr/bin/env bash
+# rofi-Modus: Anwendungsraster mit vorangestellter Zeile "zuletzt benutzt".
+#
+# Warum ein eigener Modus statt des eingebauten drun?
+#   drun liefert eine einzige, gleichfoermige Liste. Eine optisch abgesetzte
+#   erste Zeile braucht aber zweierlei: (a) die Zeile muss auf volle
+#   Spaltenzahl aufgefuellt werden, sonst rutschen alphabetische Eintraege
+#   daneben, und (b) rofi muss wissen, welche Zeilen zur MRU-Gruppe gehoeren,
+#   um sie per Theme abzusetzen. Beides gibt drun nicht her.
+#
+# Wie die Abgrenzung entsteht:
+#   Die MRU-Eintraege werden rofi ueber die Modus-Option "urgent" als
+#   Indexbereich gemeldet (z. B. 0-6). Im Theme traegt "element urgent" eine
+#   untere Kante -- daraus wird die durchgehende Trennlinie.
+#   Wichtig: Das Theme muss listview spacing auf 0 setzen und den Abstand ins
+#   element padding legen, sonst bekommt die Linie Luecken.
+#
+# Ohne MRU-Eintraege entfaellt die Zeile ersatzlos: keine Platzhalter, keine
+# Linie, das Raster beginnt direkt alphabetisch.
+set -u
+
+COLUMNS_N="${ROFI_LAUNCHER_COLUMNS:-7}"
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/rofi3.druncache"
+SEP=$'\x1f'
+
+emit() { printf '%s\0%b\n' "$1" "$2"; }
+
+# Zeichen, die Pango als Markup deuten wuerde, entschaerfen.
+esc() {
+  # Achtung: Ab bash 5.2/5.3 steht ein unmaskiertes "&" in der Ersetzung fuer
+  # den gefundenen Text. Ohne \& wuerde aus "<" das falsche "<lt;" statt
+  # "&lt;". Die Reihenfolge (& zuerst) muss bleiben, sonst doppeltes Ersetzen.
+  local t=${1//&/\&amp;}
+  t=${t//</\&lt;}
+  printf '%s' "${t//>/\&gt;}"
+}
+
+# Anzeigename plus unsichtbare Suchbegriffe: rofi filtert ueber den gesamten
+# Text, gerendert wird dank size="1" und der Hintergrundfarbe nur der Name.
+label() {
+  local n; n=$(esc "$1")
+  local k; k=$(esc "$2")
+  if [[ -n ${k// /} ]]; then
+    printf '%s<span size="1" foreground="#00000000">  %s</span>' "$n" "$k"
+  else
+    printf '%s' "$n"
+  fi
+}
+
+# ---------------------------------------------------------------- Auswahl
+# rofi ruft uns mit ROFI_RETV=1 und der Auswahl als $1 erneut auf.
+if [[ ${ROFI_RETV:-0} -eq 1 ]]; then
+  # ROFI_INFO traegt die .desktop-Datei; ohne sie ist nichts zu tun.
+  desktop="${ROFI_INFO:-}"
+  [[ -n $desktop ]] || exit 0
+
+  # Zaehler im Cache erhoehen, damit die MRU-Zeile die Realitaet abbildet.
+  # Das eingebaute drun tut dasselbe; wir muessen es hier selbst nachziehen.
+  base="${desktop##*/}"
+  if [[ -f $CACHE ]]; then
+    tmp=$(mktemp) || exit 1
+    found=0
+    while read -r n f; do
+      # Unbrauchbare Zeilen unveraendert durchreichen statt daran zu scheitern.
+      if [[ -z ${n:-} || -z ${f:-} || ! $n =~ ^[0-9]+$ ]]; then
+        [[ -n ${n:-} ]] && printf '%s %s\n' "$n" "${f:-}" >>"$tmp"
+        continue
+      fi
+      if [[ $f == "$base" ]]; then
+        printf '%s %s\n' "$((n + 1))" "$f" >>"$tmp"; found=1
+      else
+        printf '%s %s\n' "$n" "$f" >>"$tmp"
+      fi
+    done <"$CACHE"
+    ((found)) || printf '1 %s\n' "$base" >>"$tmp"
+    mv "$tmp" "$CACHE"
+  else
+    mkdir -p "$(dirname "$CACHE")"
+    printf '1 %s\n' "$base" >"$CACHE"
+  fi
+
+  setsid gtk-launch "$base" >/dev/null 2>&1 &
+  exit 0
+fi
+
+# ---------------------------------------------------------------- Aufbau
+# Alle sichtbaren .desktop-Dateien einsammeln. Spaetere Fundorte gewinnen
+# nicht: Nach XDG hat ~/.local/share Vorrang vor /usr/share, also wird ein
+# bereits bekannter Dateiname nicht ersetzt.
+declare -A NAME ICON SEEN KEYS
+dirs=()
+IFS=: read -ra xdg <<<"${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+for d in "${xdg[@]}"; do [[ -d $d/applications ]] && dirs+=("$d/applications"); done
+
+while IFS= read -r -d '' file; do
+  base="${file##*/}"
+  [[ -n ${SEEN[$base]:-} ]] && continue
+  SEEN[$base]=1
+
+  # Nur die Haupt-Desktop-Gruppe lesen; Actions am Dateiende ignorieren.
+  name=""; icon=""; nodisplay=""; hidden=""; type=""
+  generic=""; keywords=""; exe=""
+  while IFS= read -r line; do
+    case $line in
+      '[Desktop Action'*) break ;;
+      'Name='*)        [[ -z $name ]] && name="${line#Name=}" ;;
+      'Icon='*)        [[ -z $icon ]] && icon="${line#Icon=}" ;;
+      'NoDisplay='*)   nodisplay="${line#NoDisplay=}" ;;
+      'Hidden='*)      hidden="${line#Hidden=}" ;;
+      'Type='*)        type="${line#Type=}" ;;
+      'GenericName='*) [[ -z $generic ]] && generic="${line#GenericName=}" ;;
+      'Keywords='*)    [[ -z $keywords ]] && keywords="${line#Keywords=}" ;;
+      'Exec='*)        [[ -z $exe ]] && exe="${line#Exec=}" ;;
+    esac
+  done <"$file"
+
+  [[ $type == Application ]] || continue
+  [[ ${nodisplay,,} == true || ${hidden,,} == true ]] && continue
+  [[ -n $name ]] || continue
+
+  NAME[$base]="$name"
+  ICON[$base]="$icon"
+  # Suchbegriffe jenseits des Anzeigenamens: Ohne sie fuehrt "gim" nicht zu
+  # "GNU Image Manipulation Program". Das eingebaute drun durchsucht ebenso
+  # Keywords, GenericName und den Programmnamen.
+  exe="${exe%% *}"; exe="${exe##*/}"
+  KEYS[$base]="${generic} ${keywords//;/ } ${exe}"
+done < <(find "${dirs[@]}" -maxdepth 1 -name '*.desktop' -print0 2>/dev/null)
+
+# MRU-Liste: nach Zaehler absteigend, nur Eintraege mit Zaehler > 0.
+recent=()
+if [[ -f $CACHE ]]; then
+  while read -r n f; do
+    # Unvollstaendige oder fremde Zeilen ueberspringen: Der Cache wird auch
+    # von rofis eingebautem drun geschrieben und kann veraltet sein.
+    [[ -n ${n:-} && -n ${f:-} ]] || continue
+    [[ $n =~ ^[0-9]+$ ]] || continue
+    ((n > 0)) || continue
+    [[ -n ${NAME[$f]:-} ]] || continue   # deinstallierte App
+    recent+=("$n $f")
+  done <"$CACHE"
+fi
+
+mru=()
+if ((${#recent[@]})); then
+  while IFS= read -r line; do
+    mru+=("${line#* }")
+  done < <(printf '%s\n' "${recent[@]}" | sort -rn -k1,1 | head -n "$COLUMNS_N")
+fi
+
+# ---------------------------------------------------------------- Ausgabe
+# Prompt als Modus-Kopfzeile: Bei Script-Modi greift -display-<name> nicht,
+# rofi zeigt sonst schlicht den Modusnamen. Die Lupe ist U+F002 (Nerd Font).
+printf '\0prompt%s\uf002\n' "$SEP"
+printf '\0markup-rows%strue\n' "$SEP"
+
+if ((${#mru[@]})); then
+  # Nur die tatsaechlich belegten Zellen als urgent markieren waere falsch:
+  # Die Trennlinie soll ueber die volle Breite laufen, also gehoeren auch die
+  # Fuellzellen dazu.
+  printf '\0urgent%s0-%s\n' "$SEP" "$((COLUMNS_N - 1))"
+
+  # Die leeren Fuellzellen zusaetzlich als "active" melden. "nonselectable"
+  # unterbindet nur die Auswahl, nicht das Hover-Highlight der Maus; ueber
+  # den active-Zustand kann das Theme sie unsichtbar schalten.
+  if ((${#mru[@]} < COLUMNS_N)); then
+    printf '\0active%s%s-%s\n' "$SEP" "${#mru[@]}" "$((COLUMNS_N - 1))"
+  fi
+
+  for f in "${mru[@]}"; do
+    emit "$(label "${NAME[$f]}" "${KEYS[$f]:-}")" "icon${SEP}${ICON[$f]}${SEP}info${SEP}${f}"
+  done
+  # Zeile auf volle Spaltenzahl auffuellen, damit die alphabetische Liste
+  # sauber in der naechsten Zeile beginnt.
+  # Fuellzellen: "nonselectable" verhindert nur die Auswahl per Tastatur,
+  # nicht die Hover-Darstellung der Maus. Zusaetzlich als "active" melden --
+  # diesen Zustand blendet das Theme vollstaendig aus.
+  for ((i = ${#mru[@]}; i < COLUMNS_N; i++)); do
+    emit " " "nonselectable${SEP}true"
+  done
+fi
+
+# Alphabetisch, unabhaengig von der Gross-/Kleinschreibung.
+while IFS= read -r base; do
+  emit "$(label "${NAME[$base]}" "${KEYS[$base]:-}")" "icon${SEP}${ICON[$base]}${SEP}info${SEP}${base}"
+done < <(
+  for b in "${!NAME[@]}"; do printf '%s\t%s\n' "${NAME[$b]}" "$b"; done |
+    sort -f -k1,1 | cut -f2
+)

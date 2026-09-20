@@ -7,7 +7,8 @@ großes Icon-Raster, Suchfeld mit Lupe, schwebendes Fenster.
 
 ## Eigenschaften
 
-- **7 × 7 Raster** mit 84-px-Icons und Beschriftung
+- **7 × 7 Raster** mit 92-px-Icons und Beschriftung
+- **Zeile „zuletzt benutzt"** ganz oben, durch eine dezente Linie abgesetzt
 - **Suchfeld** mit Lupensymbol, Titelzeile beim Start leer
 - **Maus und Tastatur**: Hover markiert, Einfachklick startet; Pfeiltasten und Enter ebenso
 - **Floating-Overlay**: zentriert, gepinnt, schließt bei App-Wahl oder `ESC`
@@ -39,6 +40,7 @@ Entfernen: `./install.sh --uninstall`
 | Datei | Zweck |
 |---|---|
 | `~/.local/bin/omarchy-launch-rofi` | Starter mit Toggle |
+| `~/.local/bin/omarchy-rofi-drun-recent` | rofi-Modus mit Zeile „zuletzt benutzt" |
 | `~/.local/bin/omarchy-rofi-placeholder-icons` | Icon-Generator |
 | `~/.config/hypr/rofi-launcher.lua` | Tastenbindung, Fensterregeln |
 | `~/.config/omarchy/themed/applauncher.rasi.tpl` | Theme-Vorlage |
@@ -53,9 +55,9 @@ beim Deinstallieren wieder entfernt; vorher entsteht eine Sicherung.
 Raster und Größen stehen in `~/.config/omarchy/themed/applauncher.rasi.tpl`:
 
 ```css
-listview { columns: 7; lines: 7; }   /* Raster        */
-element-icon { size: 84px; }         /* Icon-Kantenlänge */
-window { width: 1770px; height: 1330px; }
+listview { columns: 7; lines: 7; }   /* Raster           */
+element-icon { size: 92px; }         /* Icon-Kantenlänge  */
+window { width: 1770px; height: 1450px; }
 ```
 
 Nach dem Ändern einmal das Theme neu setzen, damit die Vorlage greift:
@@ -66,7 +68,11 @@ omarchy-theme-set "$(< ~/.local/state/omarchy/current/theme.name)"
 
 Wird die Zeilenzahl erhöht, muss `height` mitwachsen — `fixed-height` ist
 aktiv, sonst schneidet das Fenster die letzte Reihe ab. Als Faustwert gilt
-rund 158 px pro Reihe bei 84-px-Icons.
+rund 169 px pro Reihe bei 92-px-Icons.
+
+`listview { spacing }` bleibt bewusst auf `0px`; der Zeilenabstand steckt im
+`element { padding }`. Andernfalls bekommt die Trennlinie unter der Zeile
+„zuletzt benutzt" Lücken an den Zellgrenzen.
 
 ### Platzhalter-Icons
 
@@ -83,6 +89,23 @@ behält ihre Farbe, die Palette streut über den Farbkreis. Erzeugte Dateien
 tragen eine Markierung im SVG — echte Icons werden nie überschrieben, und
 `--uninstall` löscht nur die eigenen.
 
+### Zeile „zuletzt benutzt"
+
+Die oberste Zeile zeigt die zuletzt gestarteten Anwendungen, sortiert nach
+Häufigkeit. Grundlage ist `~/.cache/rofi3.druncache` — dieselbe Datei, die
+auch rofis eingebautes `drun` führt.
+
+Sind es weniger als sieben, bleibt die Zeile trotzdem sieben Zellen breit,
+damit die alphabetische Liste sauber in der nächsten Reihe beginnt; die
+leeren Zellen sind unsichtbar und reagieren nicht auf die Maus. Gibt es
+keinen einzigen Eintrag, entfällt die Zeile samt Trennlinie ersatzlos.
+
+Die Zeile lässt sich leeren:
+
+```bash
+: > ~/.cache/rofi3.druncache
+```
+
 ## Bekannte Eigenheiten
 
 **rofi läuft über XWayland.** Das Paket `extra/rofi` ist X11-basiert; eine
@@ -94,6 +117,11 @@ deshalb auf die Klasse `Rofi`.
 Nerd-Font-Bereich; `Adwaita Sans`, die Schrift der Beschriftungen, enthält
 kein Lupenzeichen. `install.sh` warnt, falls keine passende Schrift vorhanden
 ist. Abhilfe: `ttf-jetbrains-mono-nerd`.
+
+**Das Fenster sitzt bewusst etwas oberhalb der Mitte.** `center = true`
+zentriert im *nutzbaren* Bereich, also unterhalb einer Leiste wie Waybar —
+der Launcher wirkt dadurch zu tief. Die Fensterregel rechnet stattdessen mit
+`move` gegen die volle Monitorhöhe.
 
 **Fenstergröße bei wenigen Treffern.** Das Fenster behält seine Höhe, unten
 bleibt Leerraum — so wie beim Vorbild. Wer lieber mitschrumpfende Fenster

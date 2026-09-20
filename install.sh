@@ -27,6 +27,7 @@ if [[ "${1:-}" == "--uninstall" ]]; then
   pkill -x -u "$USER" rofi 2>/dev/null || true
   rm -f "$HYPR/rofi-launcher.lua" "$BIN/omarchy-launch-rofi" \
         "$BIN/omarchy-rofi-placeholder-icons" \
+        "$BIN/omarchy-rofi-drun-recent" \
         "$CFG/rofi/applauncher.rasi" "$THEMED/applauncher.rasi.tpl"
   # Nur selbst erzeugte Platzhalter entfernen, fremde Icons bleiben liegen.
   if [[ -d $ICONS ]]; then
@@ -61,6 +62,7 @@ fi
 mkdir -p "$BIN" "$CFG/rofi" "$THEMED"
 install -m 755 "$SRC/bin/omarchy-launch-rofi"            "$BIN/omarchy-launch-rofi"
 install -m 755 "$SRC/bin/omarchy-rofi-placeholder-icons" "$BIN/omarchy-rofi-placeholder-icons"
+install -m 755 "$SRC/bin/omarchy-rofi-drun-recent"       "$BIN/omarchy-rofi-drun-recent"
 install -m 644 "$SRC/hypr/rofi-launcher.lua"             "$HYPR/rofi-launcher.lua"
 
 # Statische Fassung als Rueckfallebene (Theme ohne colors.toml, Nicht-Omarchy).
@@ -90,7 +92,18 @@ fi
 # und liefert ueber readlink nur sich selbst zurueck.
 THEME_NAME_FILE="$HOME/.local/state/omarchy/current/theme.name"
 if command -v omarchy-theme-set >/dev/null && [[ -r $THEME_NAME_FILE ]]; then
+  # omarchy-theme-set rotiert nebenbei den Hintergrund zum naechsten Bild des
+  # Themes. Da der Wechsel hier nur Mittel zum Zweck ist, vorher merken und
+  # danach zuruecksetzen -- sonst wandert das Wallpaper bei jeder Installation.
+  BG_STATE="$HOME/.local/state/omarchy/current/background"
+  BG_BEFORE=$(readlink "$BG_STATE" 2>/dev/null || true)
+
   omarchy-theme-set "$(<"$THEME_NAME_FILE")" >/dev/null 2>&1 || true
+
+  if [[ -n ${BG_BEFORE:-} && -f $BG_BEFORE ]] \
+     && [[ $(readlink "$BG_STATE" 2>/dev/null || true) != "$BG_BEFORE" ]]; then
+    omarchy-theme-bg-set "$BG_BEFORE" >/dev/null 2>&1 || true
+  fi
 fi
 
 hyprctl reload >/dev/null 2>&1 || true

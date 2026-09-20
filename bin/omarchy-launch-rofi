@@ -23,5 +23,18 @@ if pgrep -x -u "$USER" rofi >/dev/null 2>&1; then
   exit 0
 fi
 
-# -display-drun setzt den Prompt-Text: hier die Lupe (Nerd Font U+F002).
-exec rofi -show drun -display-drun $'\uf002' -theme "$THEME"
+# Eigener Modus statt des eingebauten drun: Er stellt eine Zeile mit den
+# zuletzt benutzten Anwendungen voran und meldet sie rofi als "urgent",
+# damit das Theme sie mit einer Trennlinie absetzen kann. Gibt es keine
+# zuletzt benutzten Anwendungen, entfaellt die Zeile ersatzlos.
+MODE_BIN="$(dirname "$(readlink -f "$0")")/omarchy-rofi-drun-recent"
+[[ -x $MODE_BIN ]] || MODE_BIN="$HOME/.local/bin/omarchy-rofi-drun-recent"
+
+# Spaltenzahl aus dem Theme lesen, damit Fuellzellen und Raster
+# zusammenpassen -- sonst bricht die Trennlinie an der falschen Stelle um.
+cols=$(sed -n 's/^[[:space:]]*columns:[[:space:]]*\([0-9]\+\).*/\1/p' "$THEME" | head -1)
+export ROFI_LAUNCHER_COLUMNS="${cols:-7}"
+
+# Den Prompt (die Lupe) setzt der Modus selbst per Kopfzeile -- bei
+# Script-Modi wirkt -display-<name> nicht.
+exec rofi -show apps -modi "apps:$MODE_BIN" -theme "$THEME"

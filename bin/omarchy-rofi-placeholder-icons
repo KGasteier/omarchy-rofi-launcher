@@ -40,6 +40,15 @@ def icon_exists(name):
     return False
 
 
+# Wunsch-Monogramme. Noetig nur dort, wo zwei Apps dieselbe Kurzform
+# beanspruchen und die Reihenfolge allein nicht entscheiden soll:
+# "Google Maps" und "Google Messages" ergeben beide "Gm", alphabetisch
+# bekaeme Maps den Zuschlag. Schluessel ist der Icon-Name.
+OVERRIDES = {
+    "google-messages": "Gm",
+}
+
+
 def monogram(name):
     """Kurzform aus dem App-Namen: Initialen, sonst die ersten Buchstaben."""
     parts = [p for p in name.replace("-", " ").replace("_", " ").split() if p]
@@ -47,19 +56,27 @@ def monogram(name):
     words = [p for p in parts if p.lower() not in skip] or parts
     if len(words) >= 2:
         return words[0][0].upper() + words[1][0].lower()
-    return (words[0][0].upper() + words[0][1:2].lower()) if words else "?"
+    # Ein Wort: Binnenmajuskel nutzen, falls vorhanden. "YouTube" -> "Yt",
+    # "WhatsApp" -> "Wa". Sonst die ersten beiden Buchstaben ("Hey" -> "He").
+    if words:
+        head = words[0]
+        inner = next((c for c in head[1:] if c.isupper()), None)
+        if inner:
+            return head[0].upper() + inner.lower()
+        return head[0].upper() + head[1:2].lower()
+    return "?"
 
 
 def disambiguate(name, mono, used):
     """Zweites Zeichen variieren, bis das Monogramm eindeutig ist."""
     words = [w for w in name.replace("-", " ").replace("_", " ").split() if w]
     last = words[-1] if words else name
-    # Kandidaten: erst Konsonanten des letzten Wortes (Ma -> Ms fuer "Maps"
-    # vs. "Messages"), dann dessen uebrige Buchstaben, dann der Rest des
-    # ersten Wortes.
+    # Kandidaten: die Buchstaben des letzten Wortes in ihrer natuerlichen
+    # Reihenfolge ("Maps" -> Ga), danach der Rest des ersten Wortes.
+    # Konsonanten zuerst zu probieren ergab unleserliche Kurzformen wie "Gp"
+    # fuer Maps, das ausserdem mit "Google Photos" kollidierte.
     tail = last[1:]
-    pool = [c for c in tail if c.lower() not in "aeiou"] + list(tail) \
-        + list(words[0][1:] if words else "")
+    pool = list(tail) + list(words[0][1:] if words else "")
     for ch in pool:
         if not ch.isalpha():
             continue
@@ -104,6 +121,9 @@ def main():
 
     os.makedirs(ICON_DIR, exist_ok=True)
     todo, used = {}, {}
+    # Wunsch-Monogramme vorab belegen, sonst schnappt sich die alphabetisch
+    # fruehere App die Kurzform (google-maps vor google-messages).
+    used.update({m: i for i, m in OVERRIDES.items()})
 
     for d in APP_DIRS:
         for f in sorted(glob.glob(d + "/*.desktop")):
@@ -131,10 +151,9 @@ def main():
                     continue
             if "/" in icon:
                 continue
-            mono = monogram(name)
+            mono = OVERRIDES.get(icon) or monogram(name)
             # Kollisionen aufloesen: zwei Apps duerfen nicht gleich aussehen.
-            # "Google Maps" und "Google Messages" ergaeben beide "Gm", deshalb
-            # wird der zweite Buchstabe aus dem *letzten* Wort nachgezogen
+            # Der zweite Buchstabe wird aus dem *letzten* Wort nachgezogen
             # (Ma/Ms) statt aus dem gemeinsamen Praefix.
             if mono in used and used[mono] != icon:
                 mono = disambiguate(name, mono, used)
