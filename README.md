@@ -25,7 +25,7 @@ omarchy-pkg-install rofi
 Dann:
 
 ```bash
-git clone https://github.com/<user>/omarchy-rofi-launcher.git
+git clone https://github.com/KGasteier/omarchy-rofi-launcher.git
 cd omarchy-rofi-launcher
 ./install.sh
 ```
@@ -102,3 +102,7 @@ mag, setzt `fixed-height: false`.
 ## Lizenz
 
 MIT
+
+## Autor
+
+Klaus Gasteier
