@@ -1,3 +1,5 @@
+**Deutsch** · [English](README.en.md)
+
 # Omarchy Rofi Launcher
 
 Ein App-Launcher im Stil des macOS-Launchpads für [Omarchy](https://omarchy.org):
